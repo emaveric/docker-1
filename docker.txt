@@ -1,0 +1,184 @@
+How to Docker
+
+03
+eval $(docker-machine env Char)
+
+04 
+How to check result?
+docker image ls
+
+09
+Start Debian container:
+docker run -ti --rm debian
+
+16
+To view the logs of a Docker container in real time, use the following command:
+docker logs -f <CONTAINER>
+
+19
+The docker exec command runs a new command in a running container.
+How to check result?
+curl $(docker-machine ip Char):3000
+
+20
+Run the following command to create a new swarm:
+docker swarm init --advertise-addr <MANAGER-IP>
+
+30
+How to check logs?
+docker service logs -f $(docker service ps marines -f "name=marines.11" -q)
+
+
+
+Dockerfiles (для docker build вместо ex id билда)
+
+00
+FROM alpine
+# задается базовый образ, на основе которого будет происходить сборка
+
+RUN apk update && apk upgrade && apk add vim
+
+ENTRYPOINT vim
+# Инструкция ENTRYPOINT позволяет настроить контейнер так что бы он работал как исполняемый файл.
+
+# https://wiki.merionet.ru/servernye-resheniya/9/kak-rabotat-s-dockerfile/
+
+# How to build it?
+# docker build ex00 
+# How to run it?
+# docker run --rm -ti ex00(#)
+
+01
+FROM debian
+
+LABEL maintainer="emaveric@student.21-school.ru"
+# docker inspect [id container]
+
+ENV TS3SERVER_LICENSE=accept
+# https://hub.docker.com/_/teamspeak
+# Команда ENV используется для установки переменных среды (одной или многих). Данные переменные выглядят следующим образом «ключ = значение» и они доступны внутри контейнера скриптам и различным приложениям. 
+# В этом примере для принятия лицензионного соглашения
+
+WORKDIR /home/teamspeak
+# задаёт рабочую директорию для следующей инструкции.
+
+EXPOSE 9987/udp 10011 30033
+# Инструкция EXPOSE указывает Docker что контейнер слушает определенные порты после запуска.
+
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y wget bzip2 && \
+
+# wget – это бесплатная консольная программа для загрузки файлов по сети. Поддерживает протоколы http, ftp и https, может работать через http-прокси-сервер.
+# bzip2 - распаковка, сжатие файла
+
+    wget https://files.teamspeak-services.com/releases/server/3.12.1/teamspeak3-server_linux_amd64-3.12.1.tar.bz2 && \
+
+# скачиваем архив
+# https://a-rm.ru/materials/unix-servera/teamspeak-3-ustanovka
+
+    tar -xvf teamspeak3-server_linux_amd64-3.12.1.tar.bz2
+# распаковываем
+
+WORKDIR teamspeak3-server_linux_amd64
+# Папка с распакованным архивом
+
+ENTRYPOINT sh ts3server_minimal_runscript.sh
+# ENTRYPOINT command param1 (Shell form)
+
+
+# docker build ex01
+# docker run --rm -p 9987:9987/udp -p 10011:10011 -p 30033:30033 ex01
+# docker run --rm -d -p 9987:9987/udp -p 10011:10011 -p 30033:30033 ex01 - запуск в фоновом режиме -> смотрим login, passw, token(docker logs [id of container])
+# docker exec -it [id of container (docker ps)] sh  - запуск терминала внутри контейнера
+
+02
+
+FROM ruby
+
+RUN apt-get update && apt-get upgrade -y
+
+RUN apt-get install -y nodejs sqlite3
+
+RUN gem update && gem install bundler rails
+# bundler - Это менеджер для управления зависимостями gem'ов в ruby приложениях. Эта утилита позволяет легко устанавливать необходимые gem'ы
+# Rails – фреймворк для веб-разработки, написанный на языке программирования Ruby. 
+# gem -  система управления пакетами для языка программирования Руби, которая предоставляет стандартный формат для программ и библиотек Руби (в самодостаточном формате «gems»), инструменты, предназначенные для простого управления установкой «gems», и сервер для их распространения.
+
+
+ONBUILD COPY app /opt/app
+# Инструкция ONBUILD добавляет к образу триггерную инструкцию, которая выполняется в последнюю очередь если образ используется в качестве базового для другой сборки.
+# Как это работает: 1. Когда докер встречает инструкцию ONBUILD, сборщик добавляет триггер в метаданные образа. Инструкция не оказывает влияния на текущую сборку.
+# 2. В конце сборки, список всех триггеров сохраняется в манифесте образа, в ключе OnBuild. Список можно посмотреть с помощью команды docker inspect.
+# 3. Позже образ может быть использован в качестве базового для новой сборки, с помощью инструкции FROM. Как часть обработки инструкции FROM, сборщик ищет ONBUILD триггеры и выполняет их в том же порядке в котором они были добавлены. Если один из триггеров вызывает ошибку, инструкция FROM обрывается и вызывает ошибку сборки. Если все триггеры отработали, инструкция FROM завершается и сборка продолжается как обычно.
+# 4. Триггеры очищаются в финальном образе после окончания сборки. Другими словами, дочерние образы не унаследуют триггеры прародителей.
+
+ONBUILD WORKDIR /opt/app
+
+ONBUILD EXPOSE 3000
+
+ONBUILD RUN bundle install
+
+ONBUILD RUN rake db:migrate
+# Rake — инструмент для автоматизации сборки программного кода, написаный на Ruby, подобен таким инструментам как make
+# внесение изменений в схему ???
+# запускает миграции для текущего env, которые еще не запущены
+
+ONBUILD RUN rake db:seed
+# для добавления данных
+
+# How to build it?
+# docker build ft-rails:on-build . - Создается образ из докерфайла 
+# docker build ex02 . - Создается образ как по заданию
+# docker run -it --rm -p 3000:3000 ex02 - Запуск созданного образа
+
+03
+
+FROM ubuntu
+
+RUN apt-get update -y && apt-get upgrade -y
+RUN apt-get -y install -y ca-certificates openssh-server curl
+
+RUN curl -LO https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh 
+# загрузка установочного скрипта 
+
+RUN chmod 777 script.deb.sh && ./script.deb.sh
+
+RUN apt-get install -y gitlab-ce tzdata
+# установка актуальной версии гитлаба
+
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+EXPOSE 443 80 22
+# https http ssh
+
+ENTRYPOINT (/opt/gitlab/embedded/bin/runsvdir-start &) && gitlab-ctl reconfigure && tail -f /dev/null
+# runvdir-start запускает runvdir, который должен работать в фоновом режиме.
+# gitlab-ctl reconfigure - автоматическая настройка гитлаба
+# tail -f /dev/null - необходимо добавить в конце для того, чтобы гитлаб не закрылся 
+
+# How to build it?
+# docker build ex03
+# How to run it?
+# docker run -it --rm -p 8080:80 -p 8022:22 -p 8443:443 --privileged ex03
+# http://ip Char:8080
+# https://1cloud.ru/help/linux/ustanovka-gitlab-na-ubuntu
+
+Fix for this issue `gitlab-rails` recipe fails with `TZInfo::DataSourceNotFound`
+RUN apt update && apt install -y tzdata && \
+  apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+Fix for this error Freeze on ruby_block[supervise_redis_sleep] action run
+/opt/gitlab/embedded/bin/runsvdir-start &
+
+
+
+Bonus
+
+00
+# Для си проектов
+# docker build 00 .
+# docker run -it --rm 00
+
+01
+# docker build 01
+# docker run 01 nmap 192.168.99.105
