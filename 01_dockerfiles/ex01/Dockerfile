@@ -1,7 +1,5 @@
 FROM debian
 
-LABEL maintainer="emaveric@student.21-school.ru"
-
 ENV TS3SERVER_LICENSE=accept
 
 WORKDIR /home/teamspeak
