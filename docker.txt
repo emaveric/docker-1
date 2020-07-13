@@ -27,7 +27,7 @@ docker run -ti --rm debian
 Создать раздел диска для докера и назвать его hatchery
 
 12
--e
+-e окружение, в котором что-то делаем
 --default-authentication-plugin=mysql_native_password - новая версия работает со старой идентификацией
 
 16
